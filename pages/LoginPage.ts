@@ -10,11 +10,9 @@ class LoginPage {
   constructor(page: Page) {
     this.page = page;
 
-    // Username textbox locator
-    this.userName = page.getByRole("textbox", { name: "Username" });
+    this.userName = page.locator('input[name="username"]');
 
-    // Password textbox locator
-    this.password = page.getByRole("textbox", { name: "Password" });
+    this.password = page.locator('input[name="password"]');
 
     // Login button locator
     this.loginButton = page.getByRole("button", { name: "Login" });
@@ -26,13 +24,20 @@ class LoginPage {
   /**
    * To open OrangeHRM URL in browser
    */
-  async gotoOrangeHrm() {
-    // Wait maximum 2 mins for page loading
-    await this.page.goto(`${process.env.BASE_URL}web/index.php/auth/login`, {
-      timeout: 120000,
-      waitUntil: "domcontentloaded",
-    });
-  }
+async gotoOrangeHrm() {
+  await this.page.goto(process.env.BASE_URL!, {
+    timeout: 120000,
+    waitUntil: "networkidle",
+  });
+
+  console.log("Current URL:", this.page.url());
+  console.log("Title:", await this.page.title());
+
+  await this.page.screenshot({
+    path: "github-page.png",
+    fullPage: true,
+  });
+}
 
   /**
    * To Login into OrangeHRM Application
@@ -41,10 +46,17 @@ class LoginPage {
    */
   async loginOrangeHrm(username: string, password: string) {
     // Fill username
+    await this.userName.waitFor({
+      state: "visible",
+      timeout: 120000,
+    });
     await this.userName.fill(username, {
       timeout: 120000,
     });
-
+    await this.password.waitFor({
+      state: "visible",
+      timeout: 120000,
+    });
     // Fill password
     await this.password.fill(password, {
       timeout: 120000,

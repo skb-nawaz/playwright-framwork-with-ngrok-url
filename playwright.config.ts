@@ -31,7 +31,7 @@ export default defineConfig({
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: [["html", { open: "always" }]],
+  reporter: [["html", { open: "never" }]],
   expect: {
     timeout: 30000,
   },
@@ -45,8 +45,8 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
     extraHTTPHeaders: {
-    'ngrok-skip-browser-warning': 'true',
-  }
+      "ngrok-skip-browser-warning": "true",
+    },
   },
 
   /* Configure projects for major browsers */
