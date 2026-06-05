@@ -12,7 +12,7 @@ test("global setup for auto login", async ({
 
   const dec_userName_data = commonUtilsFixture.decryptData(userName);
   const dec_password_data = commonUtilsFixture.decryptData(password);
-
+console.log(dec_password_data,dec_userName_data)
   await loginPageFixture.gotoOrangeHrm();
   await loginPageFixture.loginOrangeHrm(dec_userName_data, dec_password_data);
   await expect(dashBoardFixture.dashBoardText).toBeVisible();
