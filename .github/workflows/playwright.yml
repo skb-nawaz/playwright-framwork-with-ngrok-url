@@ -3,7 +3,8 @@ name: Playwright Tests
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:
+  pull_request:
+    branches: [ main, master ]
 
 jobs:
   test:
@@ -23,30 +24,32 @@ jobs:
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
     
-    - name: Create .env file
+    - name: Install ngrok
       run: |
-        mkdir -p env-files
-        echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> env-files/.env.dev
+        curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+          | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+        echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+          | sudo tee /etc/apt/sources.list.d/ngrok.list
+        sudo apt update
+        sudo apt install ngrok
     
-    - name: Start Cloudflare Tunnel
+    - name: Start ngrok tunnel
+      env:
+        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
       run: |
-        curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
-        chmod +x cloudflared
-        ./cloudflared tunnel --url http://localhost:80 > url.txt 2>&1 &
-        sleep 12
-        TUNNEL_URL=$(grep -o 'https://[a-z0-9.-]*\.trycloudflare\.com' url.txt | head -1)
-        echo "TUNNEL_URL=$TUNNEL_URL" >> $GITHUB_ENV
-        echo "Tunnel: $TUNNEL_URL"
+        ngrok config add-authtoken $NGROK_AUTH_TOKEN
+        # Replace with YOUR static domain from ngrok dashboard
+        ngrok http 80 --domain=YOUR-NAME.ngrok-free.app --host-header=rewrite &
+        sleep 10
     
     - name: Run Playwright tests
-      run: npm run test_dev
+      run: npx playwright test
       env:
-        ENV_NAME: dev
-        SECRET_KEY: ${{ secrets.SECRET_KEY }}
-        BASE_URL: ${{ env.TUNNEL_URL }}/orangehrm/web/index.php/auth/login
+        BASE_URL: https://YOUR-NAME.ngrok-free.app/orangehrm/web/index.php/auth/login
     
     - uses: actions/upload-artifact@v4
-      if: always()
+      if: ${{ !cancelled() }}
       with:
         name: playwright-report
         path: playwright-report/
+        retention-days: 30
