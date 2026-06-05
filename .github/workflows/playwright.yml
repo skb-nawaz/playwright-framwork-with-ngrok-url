@@ -25,98 +25,36 @@ jobs:
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
     
-    # DEBUG: List files before creating env
-    - name: Debug - List directory structure
-      run: |
-        echo "Current directory:"
-        pwd
-        echo "Files in root:"
-        ls -la
-        echo "Checking if env-files exists:"
-        ls -la env-files/ || echo "env-files directory does not exist yet"
-    
-    - name: Create environment files
+    - name: Create .env file
       run: |
         mkdir -p env-files
         echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> env-files/.env.dev
-        echo "NGROK_AUTH_TOKEN=${{ secrets.NGROK_AUTH_TOKEN }}" >> env-files/.env.dev
-        echo "BASE_URL=${{ secrets.BASE_URL }}" >> env-files/.env.dev
-        
-    # DEBUG: Verify .env.dev was created correctly
-    - name: Debug - Verify .env.dev file
-      run: |
-        echo "Checking if .env.dev exists:"
-        ls -la env-files/
-        echo "Content of .env.dev (values hidden):"
-        cat env-files/.env.dev | sed 's/=.*/=***HIDDEN***/'
-        echo "Number of lines in .env.dev:"
-        cat env-files/.env.dev | wc -l
-    
-    # DEBUG: Check if SECRET_KEY secret is available
-    - name: Debug - Check if SECRET_KEY secret exists
-      run: |
-        if [ -n "${{ secrets.SECRET_KEY }}" ]; then
-          echo "✅ SECRET_KEY secret is set (length: $(echo -n '${{ secrets.SECRET_KEY }}' | wc -c) characters)"
-        else
-          echo "❌ SECRET_KEY secret is NOT set"
-        fi
-        if [ -n "${{ secrets.NGROK_AUTH_TOKEN }}" ]; then
-          echo "✅ NGROK_AUTH_TOKEN secret is set"
-        else
-          echo "❌ NGROK_AUTH_TOKEN secret is NOT set"
-        fi
-        if [ -n "${{ secrets.BASE_URL }}" ]; then
-          echo "✅ BASE_URL secret is set"
-        else
-          echo "❌ BASE_URL secret is NOT set"
-        fi
-        if [ -n "${{ secrets.NGROK_DOMAIN }}" ]; then
-          echo "✅ NGROK_DOMAIN secret is set"
-        else
-          echo "❌ NGROK_DOMAIN secret is NOT set"
-        fi
     
     - name: Install ngrok
       run: |
-        curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
-          | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
-        echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
-          | sudo tee /etc/apt/sources.list.d/ngrok.list
+        curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+        echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
         sudo apt update
-        sudo apt install ngrok
+        sudo apt install ngrok -y
     
     - name: Start ngrok tunnel
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
       run: |
         ngrok config add-authtoken $NGROK_AUTH_TOKEN
-        ngrok http 80 --domain=${{ secrets.NGROK_DOMAIN }} --host-header=rewrite &
+        pkill ngrok || true
+        ngrok http 80 --host-header=rewrite &
         sleep 10
-        # Verify ngrok is running
-        curl -s http://localhost:4040/api/tunnels | head -20 || echo "ngrok not responding"
-    
-    # DEBUG: Check environment variables before running tests
-    - name: Debug - Check environment variables in runner
-      run: |
-        echo "ENV_NAME will be set to: dev"
-        echo "Checking if SECRET_KEY is in environment (will be empty here, but will be passed to test):"
-        env | grep SECRET_KEY || echo "SECRET_KEY not in current env (will be passed to npm run)"
-        echo "Current working directory:"
-        pwd
+        NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -oP '"public_url":"\Khttps://[^"]+' | head -1)
+        echo "NGROK_URL=$NGROK_URL" >> $GITHUB_ENV
+        echo "Ngrok tunnel started at: $NGROK_URL"
     
     - name: Run Playwright tests
       run: npm run test_dev
       env:
         ENV_NAME: dev
         SECRET_KEY: ${{ secrets.SECRET_KEY }}
-        BASE_URL: ${{ secrets.BASE_URL }}
-        NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
-    
-    # DEBUG: Test if SECRET_KEY was passed (this will run after tests)
-    - name: Debug - Verify SECRET_KEY was passed to test
-      if: always()
-      run: |
-        echo "Test run completed. Check logs above for SECRET_KEY errors."
+        BASE_URL: ${{ env.NGROK_URL }}/orangehrm/web/index.php/auth/login
     
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
