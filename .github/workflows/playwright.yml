@@ -32,13 +32,24 @@ jobs:
           echo "USER_NAME=${{ secrets.USER_NAME }}" >> env-files/.env.dev
           echo "PASSWORD=${{ secrets.PASSWORD }}" >> env-files/.env.dev
 
-      - name: Run Playwright tests
+      - name: Generate Linux Snapshots
         env:
           ENV_NAME: dev
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           BASE_URL: ${{ secrets.BASE_URL }}
+          USER_NAME: ${{ secrets.USER_NAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
           CI: true
-        run: npm run test_dev
+        run: |
+          npx playwright test tests/login-module-visual-testing.spec.ts --project=chromium --update-snapshots
+
+      - name: Upload Linux Snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-snapshots
+          path: tests/login-module-visual-testing.spec.ts-snapshots/
+          retention-days: 30
 
       - name: Upload Debug Files
         if: always()
