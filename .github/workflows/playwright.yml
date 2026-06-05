@@ -5,6 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -24,6 +25,13 @@ jobs:
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
     
+    - name: Create environment files
+      run: |
+        mkdir -p env-files
+        echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> env-files/.env.dev
+        echo "NGROK_AUTH_TOKEN=${{ secrets.NGROK_AUTH_TOKEN }}" >> env-files/.env.dev
+        echo "BASE_URL=${{ secrets.BASE_URL }}" >> env-files/.env.dev
+    
     - name: Install ngrok
       run: |
         curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
@@ -38,14 +46,13 @@ jobs:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
       run: |
         ngrok config add-authtoken $NGROK_AUTH_TOKEN
-        # Replace with YOUR static domain from ngrok dashboard
-        ngrok http 80 --domain=YOUR-NAME.ngrok-free.app --host-header=rewrite &
+        ngrok http 80 --domain=${{ secrets.NGROK_DOMAIN }} --host-header=rewrite &
         sleep 10
     
     - name: Run Playwright tests
-      run: npx playwright test
+      run: npm run test_dev
       env:
-        BASE_URL: https://YOUR-NAME.ngrok-free.app/orangehrm/web/index.php/auth/login
+        ENV_NAME: dev
     
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
