@@ -37,19 +37,38 @@ jobs:
         sudo apt update
         sudo apt install ngrok -y
     
-    - name: Start ngrok tunnel (dynamic URL)
+    - name: Start ngrok tunnel
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
       run: |
+        # Reset ngrok config to remove any saved domain
+        rm -f /home/runner/.config/ngrok/ngrok.yml
         ngrok config add-authtoken $NGROK_AUTH_TOKEN
+        
+        # Kill any existing ngrok processes
         pkill ngrok || true
-        # Use random subdomain instead of static
-        ngrok http 80 --host-header=rewrite --log=stdout &
-        sleep 10
-        # Extract the dynamic URL
-        NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | python3 -c "import sys, json; print(json.load(sys.stdin)['tunnels'][0]['public_url'])")
-        echo "NGROK_URL=$NGROK_URL" >> $GITHUB_ENV
-        echo "Ngrok tunnel: $NGROK_URL"
+        
+        # Start with random domain (no --domain flag)
+        nohup ngrok http 80 --host-header=rewrite &
+        
+        # Wait for ngrok to start
+        sleep 15
+        
+        # Get the dynamic URL
+        for i in {1..10}; do
+          NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"[^"]*' | grep -o 'https://[^"]*' | head -1)
+          if [ -n "$NGROK_URL" ]; then
+            echo "NGROK_URL=$NGROK_URL" >> $GITHUB_ENV
+            echo "✅ Ngrok tunnel: $NGROK_URL"
+            break
+          fi
+          sleep 2
+        done
+        
+        if [ -z "$NGROK_URL" ]; then
+          echo "❌ Failed to get ngrok URL"
+          exit 1
+        fi
     
     - name: Run Playwright tests
       run: npm run test_dev
