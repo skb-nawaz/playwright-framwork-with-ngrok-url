@@ -29,6 +29,8 @@ jobs:
         run: |
           mkdir -p env-files
           echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" > env-files/.env.dev
+          echo "USER_NAME=${{ secrets.USER_NAME }}" >> env-files/.env.dev
+          echo "PASSWORD=${{ secrets.PASSWORD }}" >> env-files/.env.dev
 
       - name: Run Playwright tests
         env:
